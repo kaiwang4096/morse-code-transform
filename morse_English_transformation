@@ -1,0 +1,634 @@
+//这个文件用于实现摩斯码的转化，包括摩斯码转换成中文和中文转换成摩斯码
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+static char alphabet[26][4]={
+		{'.','-','*','*'},  //A
+		{'-','.','.','.'},  //B
+		{'-','.','-','.'},  //C
+		{'-','.','.','*'},  //D
+		{'.','*','*','*'},  //E
+		{'.','.','-','.'},  //F
+		{'-','-','.','*'},  //G
+		{'.','.','.','.'},  //H
+		{'.','.','*','*'},  //I
+		{'.','-','-','-'},  //J
+		{'-','.','-','*'},  //K
+		{'.','-','.','.'},  //L
+		{'-','-','*','*'},  //M
+		{'-','.','*','*'},  //N
+		{'-','-','-','*'},  //O
+		{'.','-','-','.'},  //P
+		{'-','-','.','-'},  //Q
+		{'.','-','.','*'},  //R
+		{'.','.','.','*'},  //S
+		{'-','*','*','*'},  //T
+		{'.','.','-','*'},  //U
+		{'.','.','.','-'},  //V
+		{'.','-','-','*'},  //W
+		{'-','.','.','-'},  //X
+		{'-','.','-','-'},  //Y
+		{'-','-','.','.'},  //Z
+	};
+
+static char numbers[10][5]={
+		{'-','-','-','-','-'},  //0
+		{'.','-','-','-','-'},  //1
+		{'.','.','-','-','-'},  //2
+		{'.','.','.','-','-'},  //3
+		{'.','.','.','.','-'},  //4
+		{'.','.','.','.','.'},  //5
+		{'-','.','.','.','.'},  //6
+		{'-','-','.','.','.'},  //7
+		{'-','-','-','.','.'},  //8
+		{'-','-','-','-','.'},  //9
+	};
+
+static char special_character[8][6]={
+		{'.','-','.','-','.','-'},  //.
+		{'-','-','.','.','-','-'},  //,
+		{'.','.','-','-','.','.'},  //?
+		{'.','.','-','-','.','*'},  //!
+		{'-','-','-','.','.','.'},  //:
+		{'.','-','.','.','-','.'},  //"
+		{'.','-','-','-','-','.'},  //'
+		{'-','.','.','.','-','*'},  //=
+	};
+
+#define stringlength 1000 //可根据需要进行修改
+#define p1p2length 1000  //可根据需要进行修改
+
+static int counter1;
+static int jp1p2; //用于保存p1p2数组所用的长度
+static int pointer = 0, count_two;
+//static int punctuation_number = 0;  //用于记录标点符号的个数
+
+static char input_english_morsecode[stringlength] = {0};
+static int  p1p2[p1p2length] = {0};  //用于保存程序识别到的p2和p1的值，并初始化其值为0
+static char string[800];  //摩斯码转换成英文后保存到这个数组
+
+
+void convert_to_lower_form(char *english, int length);
+void english_to_morse(char *english, int length);
+void morse_to_english(char *morse);
+void morse_numbers(char *morsecode);
+void morse_to_letter(int *string1, int present_location);
+
+
+int main()
+{
+	int i;
+	printf("morse to english press 0;\nenglish to morse press 1\n");
+	scanf("%d", &i);
+	if(i == 0)
+	{
+		printf("please input the morse code to be converted!\n");
+		getchar();
+		//将用户输入的morse码保存到input_english_morsecode当中
+		fgets(input_english_morsecode, stringlength, stdin);
+		counter1 = strlen(input_english_morsecode);
+		morse_to_english(input_english_morsecode);
+	}
+	else if(i == 1)
+	{
+		printf("please input english string\n");
+		getchar();
+		//将用户输入的字符串保存到input_english_morsecode字符串中
+		fgets(input_english_morsecode, stringlength, stdin);
+		counter1 = strlen(input_english_morsecode);
+		convert_to_lower_form(input_english_morsecode, counter1);
+		english_to_morse(input_english_morsecode, counter1);
+	}
+	else
+	{
+		printf("Enter error! Please enter 0 or 1\n");
+	}
+	getchar();
+	return 0;
+}
+
+//将摩斯码转换为相应的英文字符
+void morse_to_english(char *morse)
+{
+	morse_numbers(input_english_morsecode);
+	//根据p1p2数组得到的数据进行分析，得到每一个字母或单词或句子的间隔，然后进行相应的转换
+	 
+	//输入的时候首位不是空格
+	//将摩斯码中除空格以外的部分转换为字母或特殊字符或数字，并保存到数组string[50]中
+	for(int j=0; j<jp1p2; j+=2)
+	{
+		morse_to_letter(p1p2, j);
+		pointer++;
+	}
+	//将用户输入的字符串中的空格插入到数组string[50]当中
+	for(unsigned int jj = 1; jj < jp1p2-1; jj += 2)
+	{ 
+		if(p1p2[jj + 1] - p1p2[jj] == 2)
+		{ 
+			//若只有一个空格，应该是对应的摩斯码之间的空格，转换之后应将这个空格去掉，在string函数当中就不需要改动
+			//若有两个空格，则应该是不同单词之间的分隔，此时需要把这两个空格变为一个空格，插入到string函数的相应位置
+			for(int jjj = strlen(string); jjj > (jj+1)/2 + count_two; )
+			{
+				string[jjj] = string[jjj-1];
+				jjj--;
+				if(jjj == (jj+1)/2 + count_two)
+				{
+					string[jjj] = ' ';
+					count_two++;  //用于判断一共有多少个两个空格，用于之后的单词之间的分隔
+				} 
+			}
+		}
+	}
+
+	/*for(int iii=0; iii<strlen(string); iii++)
+	{
+		printf("%c", string[iii]);
+	}*/
+	printf("%s\n", string);
+	return;
+}
+
+//将输入的英文字符转换为摩斯码
+void english_to_morse(char *english, int length)
+{
+	//下面将字符串转换为摩斯密码
+	for(int i=0; i<length; i++)
+	{
+		int counter4 = 1024;
+
+		//若写入的字符是26个英文字母，将字母转化为摩斯码
+		if(*(english+i) >= 97 && *(english+i) <= 122)
+		{
+			int counter2 = *(english+i) - 'a';
+			for(int j=0; j<4; j++)
+			{
+				if(alphabet[counter2][j] != '*')
+				{
+					printf("%c", alphabet[counter2][j]);
+				}
+			}
+			//字母转换结束后，如果最后下一个字符不是空格，则输出一个空格作为分隔，
+
+			if(*(english+i+1) != ' ')
+			{
+				printf(" ");
+			}
+		}
+
+		//若写入的是空格，则显示的时候输出两个空格
+		else if(*(english+i) == ' ')
+		{
+			printf("  ");
+		}
+
+		//若写入的是0~9这些字符，则将这些字符数字转换为相应的摩斯码
+		else if(*(english+i) >= 48 && *(english+i) <= 57)
+		{
+			int counter3 = *(english+i) - '0';
+			for(int j=0; j<5; j++)
+			{
+				printf("%c", numbers[counter3][j]);
+			}
+			printf(" ");
+		}
+
+		//若写入的是特殊字符，则将这些特殊字符转换为相应的摩斯码
+		else if(*(english+i) == '.' || *(english+i) == ',' || *(english+i) == '?' || *(english+i) == '!' || *(english+i) == ':' || *(english+i) == '"' || *(english+i) == 39 || *(english+i) == '=')
+		{
+			if(*(english+i) == '.')
+			{
+				counter4 = 0;
+			}
+			else if(*(english+i) == ',')
+			{
+				counter4 = 1;
+			}
+			else if(*(english+i) == '?')
+			{
+				counter4 = 2;
+			}
+			else if(*(english+i) == '!')
+			{
+				counter4 = 3;
+			}
+			else if(*(english+i) == ':')
+			{
+				counter4 = 4;
+			}
+			else if(*(english+i) == '"')
+			{
+				counter4 = 5;
+			}
+			else if(*(english+i) == 39)
+			{
+				counter4 = 6;
+			}
+			else if(*(english+i) == '=')
+			{
+				counter4 = 7;
+			}
+
+			if(counter4 != 1024)
+			{
+				for(int j=0; j<6; j++)
+				{
+					if(special_character[counter4][j] != '*')
+					{
+						printf("%c", special_character[counter4][j]);
+					}
+					/*else
+					{
+						printf("    ");
+						break;
+					}*/
+				}
+
+				//若这个特殊符号后是空格，那么什么也不做，如果不是空格，则输出一个空格
+				if(*(english+i+1) != ' ')
+				{
+					printf(" ");
+				}
+				counter4 = 1024;
+			}
+		}
+		
+	}
+	return;
+}
+
+//将英文字母全部转换为小写
+void convert_to_lower_form(char *english, int length)
+{
+	int i;
+	for(i=0; i<length; i++)
+	{
+		if(*(english+i) >= 65 && *(english+i)<=90)
+		{
+			*(english+i) += 32;
+		}
+	}
+	return;
+}
+
+//找出空格之间的morse码的个数，方便接下来的判断
+//*morsecode : 表示用户输入的morse码
+void morse_numbers(char *morsecode)
+{
+	jp1p2=0;
+	for(int i=0; i<counter1; i++)
+	{
+		//当摩斯码中检测到的为空格时，需要判断它前面的字符是不是不是空格
+		if(*(morsecode+i) == ' ')
+		{
+			if((i != 0) && *(morsecode+i-1) != ' ')
+			{
+				p1p2[jp1p2] = i; //记录这个空格之前的不是空格的字符的位置
+				jp1p2++;
+			}
+		}
+		//当指针所指的内容不等于空格时，需要判断出这个内容和下一个空格之间的距离
+		else
+		{	
+			if(i == 0)
+			{
+				p1p2[jp1p2] = 0;
+				jp1p2++;
+			}
+			else if(*(morsecode+i-1) == ' ' && *(morsecode+i) != '\n')  //后面加的这个不等于回车的条件用于避免在整型数组中保存同样的数值
+			{
+				p1p2[jp1p2] = i;  //用于记录这个非空格字符之前的这个空格的位置
+				jp1p2++;
+			}
+			else if(*(morsecode+i-1) == ' ' && *(morsecode+i) == '\n'){}
+			else if(*(morsecode+i-1) != ' ' && *(morsecode+i) == '\n')
+			{
+				p1p2[jp1p2] = i;  //回车表示用户输入的摩斯码已经全部转换完成，但若最后不是空格，那么，需要将这个数组的长度减1的值保存到整型数组的最后当中
+				jp1p2++;
+			}
+		}
+	}
+}
+
+//通过摩斯码的字符数目来判断其到底是代表哪个字母
+//amount1 : 表示p1p2数组中从0开始计数的偶数值
+//amount2 : 表示p1p2数组中从0开始计数的基数值
+void morse_to_letter(int *string1, int present_location)
+{
+	//用于判断摩斯码的数目，是一位的话，表示E
+	if(*(string1 + present_location +1) - *(string1 + present_location) == 1) 
+	{
+		if(input_english_morsecode[*(string1 + present_location)] == '.')
+		{
+			string[pointer] = 'E';
+		}
+		else
+		{
+			string[pointer] = 'T';
+		}
+	}
+	//用于判断摩斯码为2个字符，表示的字母可能是I A M N
+	else if(*(string1 + present_location +1) - *(string1 + present_location) == 2)
+	{
+		if(input_english_morsecode[*(string1 + present_location)] == '.')
+		{
+			if(input_english_morsecode[*(string1 + present_location) + 1] == '.')
+			{
+				string[pointer] = 'I';
+			}
+			else
+			{
+				string[pointer] = 'A';
+			}
+		}
+		else if(input_english_morsecode[*(string1 + present_location)] == '-')
+		{
+			if(input_english_morsecode[*(string1 + present_location) + 1] == '.')
+			{
+				string[pointer] = 'N';
+			}
+			else
+			{
+				string[pointer] = 'M';
+			}
+		}
+	}
+	//摩斯码占三个字符
+	else if(*(string1 + present_location +1) - *(string1 + present_location) == 3)
+	{
+		if(input_english_morsecode[*(string1 + present_location)] == '.')
+		{
+			if(input_english_morsecode[*(string1 + present_location) + 1] == '.')
+			{
+				if(input_english_morsecode[*(string1 + present_location) + 2] == '.')
+				{
+					string[pointer] = 'S';
+				}
+				else
+				{
+					string[pointer] = 'U';
+				}
+			}
+			else
+			{
+				if(input_english_morsecode[*(string1 + present_location) + 2] == '.')
+				{
+					string[pointer] = 'R';
+				}
+				else
+				{
+					string[pointer] = 'W';
+				}
+			}
+		}
+		else
+		{
+			if(input_english_morsecode[*(string1 + present_location) + 1] == '.')
+			{
+				if(input_english_morsecode[*(string1 + present_location) + 2] == '.')
+				{
+					string[pointer] = 'D';
+				}
+				else
+				{
+					string[pointer] = 'K';
+				}
+			}
+			else
+			{
+				if(input_english_morsecode[*(string1 + present_location) + 2] == '.')
+				{
+					string[pointer] = 'G';
+				}
+				if(input_english_morsecode[*(string1 + present_location) + 2] == '-')
+				{
+					string[pointer] = 'O';
+				}
+				
+			}
+		}
+	}
+	//摩斯码占四个字符
+	else if(*(string1 + present_location +1) - *(string1 + present_location) == 4)
+	{
+		//.开头
+		if(input_english_morsecode[*(string1 + present_location)] == '.')
+		{
+			if(input_english_morsecode[*(string1 + present_location) + 1] == '.')
+			{
+				if(input_english_morsecode[*(string1 + present_location) + 2] == '.')
+				{
+					if(input_english_morsecode[*(string1 + present_location) + 3] == '.')
+					{
+						string[pointer] = 'H';
+					}
+					else
+					{
+						string[pointer] = 'V';
+					}
+				}
+				else
+				{
+					string[pointer] = 'F';
+				}
+			}
+			else
+			{
+				if(input_english_morsecode[*(string1 + present_location) + 2] == '.')
+				{
+						string[pointer] = 'L';
+				}
+				else
+				{
+					if(input_english_morsecode[*(string1 + present_location) + 3] == '.')
+					{
+						string[pointer] = 'P';
+					}
+					else
+					{
+						string[pointer] = 'J';
+					}
+				}
+			}
+		}
+		//-开头
+		else
+		{
+			if(input_english_morsecode[*(string1 + present_location) + 1] == '.')
+			{
+				if(input_english_morsecode[*(string1 + present_location) + 2] == '.')
+				{
+					if(input_english_morsecode[*(string1 + present_location) + 3] == '.')
+					{
+						string[pointer] = 'B';
+					}
+					else
+					{
+						string[pointer] = 'X';
+					}
+				}
+				else
+				{
+					if(input_english_morsecode[*(string1 + present_location) + 3] == '.')
+					{
+						string[pointer] = 'C';
+					}
+					else
+					{
+						string[pointer] = 'Y';
+					}
+				}
+			}
+			else
+			{
+				if(input_english_morsecode[*(string1 + present_location) + 2] == '.')
+				{
+					if(input_english_morsecode[*(string1 + present_location) + 3] == '.')
+					{
+						string[pointer] = 'Z';
+					}
+					else
+					{
+						string[pointer] = 'Q';
+					}
+				}
+			}
+		}
+	}
+
+	//摩斯码占5个字符
+	else if(*(string1 + present_location +1) - *(string1 + present_location) == 5)
+	{
+		if(input_english_morsecode[*(string1 + present_location)] == '.')
+		{
+			if(input_english_morsecode[*(string1 + present_location) + 1] == '.')
+			{
+				if(input_english_morsecode[*(string1 + present_location) + 2] == '.')
+				{
+					if(input_english_morsecode[*(string1 + present_location) + 3] == '.')
+					{
+						if(input_english_morsecode[*(string1 + present_location) + 4] == '.')
+						{
+							string[pointer] = '5';
+						}
+						else
+						{
+							string[pointer] = '4';
+						}
+					}
+					else
+					{
+							string[pointer] = '3';
+					}
+				}
+				else
+				{
+					if(input_english_morsecode[*(string1 + present_location) + 3] == '-')
+					{
+						if(input_english_morsecode[*(string1 + present_location) + 4] == '.')
+						{
+							string[pointer] = '!';
+						}
+						else
+						{
+							string[pointer] = '2';
+						}
+					}
+				}
+			}
+			else
+			{
+				string[pointer] = '1';
+			}
+		}
+		//-开头
+		else
+		{
+			if(input_english_morsecode[*(string1 + present_location) + 1] == '.')
+			{
+				if(input_english_morsecode[*(string1 + present_location) + 2] == '.')
+				{
+					if(input_english_morsecode[*(string1 + present_location) + 3] == '.')
+					{
+						if(input_english_morsecode[*(string1 + present_location) + 4] == '.')
+						{
+							string[pointer] = '6';
+						}
+						else
+						{
+							string[pointer] = '=';
+						}
+					}
+				}
+			}
+			else
+			{
+				if(input_english_morsecode[*(string1 + present_location) + 2] == '-')
+				{
+					if(input_english_morsecode[*(string1 + present_location) + 3] == '-')
+					{
+						if(input_english_morsecode[*(string1 + present_location) + 4] == '-')
+						{
+							string[pointer] = '0';
+						}
+						else
+						{
+							string[pointer] = '9';
+						}
+					}
+					else
+					{
+						string[pointer] = '8';
+					}
+				}
+				else
+				{
+					string[pointer] = '7';
+				}
+			}
+		}
+	}
+
+	//摩斯码占6个字符
+	else if(*(string1 + present_location +1) - *(string1 + present_location) == 6)
+	{
+		if(input_english_morsecode[*(string1 + present_location)] == '.')
+		{
+				if(input_english_morsecode[*(string1 + present_location) + 2] == '.')
+				{
+					if(input_english_morsecode[*(string1 + present_location) + 3] == '.')
+					{
+						string[pointer] = '"';
+					}
+					else
+					{
+						string[pointer] = '.';
+					}
+				}
+				else
+				{
+					if(input_english_morsecode[*(string1 + present_location) + 1] == '-')
+					{
+						string[pointer] = 39; //单引号
+					}
+					else
+					{
+							string[pointer] = '?';
+					}
+				}
+		}
+		else
+		{
+			if(input_english_morsecode[*(string1 + present_location) + 2] == '.')
+			{
+				string[pointer] = ',';
+			}
+			else
+			{
+				string[pointer] = ':';
+			}
+		}
+	}
+
+	return;
+}
